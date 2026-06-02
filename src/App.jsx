@@ -10,7 +10,7 @@ import './App.css';
 function App() {
   const { settings } = useStore();
   
-  // Apply theme settings to HTML element
+  // Aplica as configurações de tema no elemento HTML
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', settings.theme || 'light');
     document.documentElement.setAttribute('data-contrast', settings.contrast || 'normal');

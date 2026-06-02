@@ -98,8 +98,7 @@ export default function ContactsPage() {
     let raw = c.phone.replace(/\D/g, '');
     let dddState = '11';
     let phonePart = '';
-    
-    // Ensure backwards compatibility with old records
+    // Garante compatibilidade caso o número já esteja salvo com o código do país
     if (raw.startsWith('55') && raw.length >= 12) {
       dddState = raw.substring(2, 4);
       phonePart = raw.substring(4);

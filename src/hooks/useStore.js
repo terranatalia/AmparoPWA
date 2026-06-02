@@ -18,7 +18,7 @@ export const useStore = () => {
       const saved = localStorage.getItem('amparo_store');
       return saved ? JSON.parse(saved) : DEFAULT_STATE;
     } catch (e) {
-      console.error("Failed to load state", e);
+      console.error("Falha ao carregar o estado", e);
       return DEFAULT_STATE;
     }
   });

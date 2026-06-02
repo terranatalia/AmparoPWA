@@ -21,7 +21,7 @@ export default function HomePage() {
 
   const handleHelpClick = () => {
     if (countdown === null) {
-      // Vibrate to provide feedback
+      // Vibra para fornecer feedback
       if (navigator.vibrate) navigator.vibrate(200);
       setCountdown(3);
     }
@@ -35,7 +35,7 @@ export default function HomePage() {
     const defaultContactId = settings.selectedContactId;
     let targetContact = contacts.find(c => c.id === defaultContactId);
     
-    // If no specific contact selected, but there are contacts, pick the first one
+    // Se nenhum contato especifico foi selecionado, mas ha contatos, pega o primeiro
     if (!targetContact && contacts.length > 0) {
       targetContact = contacts[0];
     }
@@ -62,10 +62,9 @@ export default function HomePage() {
     const phone = targetContact.phone.replace(/\D/g, '');
     let url = `https://wa.me/${phone}?text=${encodeURIComponent(message)}`;
     
-    // For Brazilian numbers, sometimes we need country code 55. We assume User inputted DDI/DDD correctly.
-    // If it length is 10 or 11 without 55, it might fail. Better to leave it as the user sets.
+    // Para numeros brasileiros, assumimos que o usuario digitou DDI/DDD corretamente.
     
-    // Vibrate success pattern
+    // Padrao de vibracao de sucesso
     if (navigator.vibrate) navigator.vibrate([200, 100, 200]);
     
     window.location.href = url;
