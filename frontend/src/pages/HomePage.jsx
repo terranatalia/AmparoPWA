@@ -1,10 +1,39 @@
 import { useState, useEffect } from 'react';
 import { useStore } from '../hooks/useStore';
 import { AlertCircle, XCircle } from 'lucide-react';
+import api from '../services/api';
 
 export default function HomePage() {
-  const { settings, contacts } = useStore();
+  const { settings } = useStore();
+
   const [countdown, setCountdown] = useState(null);
+  const [contacts, setContacts] = useState([]);
+  const [emergencyMessage, setEmergencyMessage] = useState("Preciso de ajuda urgente!");
+  const [erro, setErro] = useState(null);
+
+
+  useEffect(() => {
+    const buscarDadosIniciais = async () => {
+      try {
+   
+        const resContatos = await api.get('/contato_emergencia');
+        if (resContatos.data && resContatos.data.length > 0) {
+  
+          setContacts(resContatos.data);
+        }
+
+        const resMensagem = await api.get('/mensagem');
+        if (resMensagem.data && resMensagem.data.length > 0) {
+          setEmergencyMessage(resMensagem.data[0].conteudo || resMensagem.data[0].texto);
+        }
+      } catch (err) {
+        console.error("Erro ao carregar dados da Home:", err);
+        setErro("Não foi possível carregar as configurações de emergência.");
+      }
+    };
+
+    buscarDadosIniciais();
+  }, []);
   
   useEffect(() => {
     let timer;
@@ -21,7 +50,7 @@ export default function HomePage() {
 
   const handleHelpClick = () => {
     if (countdown === null) {
-      // Vibra para fornecer feedback
+    
       if (navigator.vibrate) navigator.vibrate(200);
       setCountdown(3);
     }
@@ -31,45 +60,61 @@ export default function HomePage() {
     setCountdown(null);
   };
 
-  const triggerHelp = async () => {
-    const defaultContactId = settings.selectedContactId;
-    let targetContact = contacts.find(c => c.id === defaultContactId);
-    
-    // Se nenhum contato especifico foi selecionado, mas ha contatos, pega o primeiro
-    if (!targetContact && contacts.length > 0) {
-      targetContact = contacts[0];
+ const triggerHelp = async () => {
+
+  if (!contacts || contacts.length === 0) {
+    alert("Por favor, adicione um contato de emergência na aba Contatos antes de pedir ajuda.");
+    return;
+  }
+
+  let message = emergencyMessage;
+  let latitudeAtual = null;
+  let longitudeAtual = null;
+
+ 
+  if (navigator.geolocation) {
+    try {
+      const position = await new Promise((resolve, reject) => {
+        navigator.geolocation.getCurrentPosition(resolve, reject, { timeout: 10000 });
+      });
+      
+      const { latitude, longitude } = position.coords;
+      latitudeAtual = latitude;
+      longitudeAtual = longitude;
+      
+      message += `\n\nMinha localização: https://maps.google.com/?q=${latitude},${longitude}`;
+    } catch (e) {
+      console.error("Localização falhou", e);
     }
+  }
 
-    if (!targetContact) {
-      alert("Por favor, adicione um contato de emergência na aba Contatos antes de pedir ajuda.");
-      return;
-    }
 
-    let message = settings.message;
+  try {
+    const payloadAlerta = {
+      descricao: "Botão de emergência acionado",
+      latitude: latitudeAtual,
+      longitude: longitudeAtual,
+      data: new Date().toISOString()
+    };
 
-    if (settings.useLocation && navigator.geolocation) {
-      try {
-        const position = await new Promise((resolve, reject) => {
-          navigator.geolocation.getCurrentPosition(resolve, reject, { timeout: 10000 });
-        });
-        const { latitude, longitude } = position.coords;
-        message += `\n\nMinha localização: https://maps.google.com/?q=${latitude},${longitude}`;
-      } catch (e) {
-        console.error("Localização falhou", e);
-      }
-    }
+   
+    await api.post('/alerta', payloadAlerta);
+    console.log("Alerta registrado com sucesso no MariaDB!");
+  } catch (err) {
+  
+    console.error("Falha ao registrar histórico de alerta no banco:", err);
+  }
 
-    const phone = targetContact.phone.replace(/\D/g, '');
-    let url = `https://wa.me/${phone}?text=${encodeURIComponent(message)}`;
+
+  const phone = contacts[0].phone.replace(/\D/g, '');
+  const url = `https://wa.me/${phone}?text=${encodeURIComponent(message)}`;
+
+  if (navigator.vibrate) navigator.vibrate([200, 100, 200]);
+
+
+  window.location.href = url;
+};
     
-    // Para numeros brasileiros, assumimos que o usuario digitou DDI/DDD corretamente.
-    
-    // Padrao de vibracao de sucesso
-    if (navigator.vibrate) navigator.vibrate([200, 100, 200]);
-    
-    window.location.href = url;
-  };
-
   return (
     <div className="page-container" style={{ alignItems: 'center', justifyContent: 'center', flexGrow: 1, textAlign: 'center' }}>
       <h1 style={{ marginBottom: '2rem', fontSize: '2rem' }}>Amparo</h1>

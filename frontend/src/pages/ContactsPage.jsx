@@ -1,6 +1,7 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useStore } from '../hooks/useStore';
 import { UserPlus, Trash2, Edit2 } from 'lucide-react';
+import api from '../services/api';
 
 const DDD_LIST = [
   { value: '11', label: 'SP (11)' },
@@ -73,11 +74,25 @@ const DDD_LIST = [
 ];
 
 export default function ContactsPage() {
-  const { contacts, addContact, removeContact, updateContact } = useStore();
+  const { addContact, removeContact, updateContact } = useStore();
+  const [contacts, setContacts] = useState([]);
+  const [erro, setErro] = useState(null);
   const [isAdding, setIsAdding] = useState(false);
   const [editingId, setEditingId] = useState(null);
   
   const [formData, setFormData] = useState({ name: '', ddd: '11', phone: '' });
+
+useEffect(() => {
+  api.get('/contato_emergencia')
+    .then(response => {
+      setContacts(response.data); 
+    })
+    .catch(err => {
+      console.error("Erro ao carregar contatos do banco:", err);
+      setErro("Falha ao carregar os contatos de emergência.");
+    });
+}, []);
+
 
   const applyMask = (val) => {
     let v = val.replace(/\D/g, '');
@@ -98,29 +113,40 @@ export default function ContactsPage() {
     let raw = c.phone.replace(/\D/g, '');
     let dddState = '11';
     let phonePart = '';
-    // Garante compatibilidade caso o número já esteja salvo com o código do país
-    if (raw.startsWith('55') && raw.length >= 12) {
-      dddState = raw.substring(2, 4);
-      phonePart = raw.substring(4);
-    } else if (raw.length >= 10) {
-      dddState = raw.substring(0, 2);
-      phonePart = raw.substring(2);
+   
+
+const handleSubmit = async (e) => {
+  e.preventDefault();
+  const rawPhone = formData.phone.replace(/\D/g, '');
+  
+  if (!formData.name.trim() || rawPhone.length < 8) {
+    alert("Por favor, preencha o número corretamente (8 ou 9 dígitos).");
+    return;
+  }
+
+  const E164Phone = `55${formData.ddd}${rawPhone}`;
+  const contactPayload = { name: formData.name, phone: E164Phone };
+
+  try {
+    if (editingId) {
+      const response = await api.put(`/contato_emergencia/${editingId}`, contactPayload);
+      
+      setContacts(prev => prev.map(c => c.id === editingId ? response.data : c));
+      alert("Contato atualizado com sucesso!");
     } else {
-      phonePart = raw;
+   
+      const response = await api.post('/contato_emergencia', contactPayload);
+      
+      setContacts(prev => [...prev, response.data]);
+      alert("Contato adicionado com sucesso!");
     }
-
-    setFormData({ name: c.name, ddd: dddState, phone: applyMask(phonePart) });
-    setEditingId(c.id);
-    setIsAdding(true);
-  };
-
-  const handleSubmit = (e) => {
-    e.preventDefault();
-    const rawPhone = formData.phone.replace(/\D/g, '');
-    if (!formData.name.trim() || rawPhone.length < 8) {
-      alert("Por favor, preencha o número corretamente (8 ou 9 dígitos).");
-      return;
-    }
+    
+    resetForm();
+  } catch (err) {
+    console.error("Erro ao salvar contato no servidor:", err);
+    alert("Erro ao salvar contato. Verifique se o backend está ligado.");
+  }
+};
     
     const E164Phone = `55${formData.ddd}${rawPhone}`;
     const contactPayload = { name: formData.name, phone: E164Phone };

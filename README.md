@@ -9,7 +9,7 @@ Projeto Amparo desenvolve uma PWA de botão digital para pedido de ajuda para pe
 **Integrantes:** 
 1. **Arthur Macedo Falcão Ferreira:** *Desenvolvedor Front-End, UX/UI;* 
 2. **Guilherme Bilinski das Neves:** *Desenvolvedor Back-End;* 
-3. **Matheus Menezes Gomes:** *Desenvolvedor Back-End;* 
+3. **Matheus Menezes Gomes:** *Desenvolvedor Back-End, QA/Tester;* 
 4. **Natália Medeiros Terra Modesto da Silva:** *Desenvolvedora Fullstack, QA/Tester, Líder Técnico.*
 
 **Projeto Escolhido:** Projeto Amparo 
