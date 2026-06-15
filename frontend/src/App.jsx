@@ -5,7 +5,6 @@ import ContactsPage from './pages/ContactsPage';
 import SettingsPage from './pages/SettingsPage';
 import { useStore } from './hooks/useStore';
 import { useEffect } from 'react';
-import './App.css';
 
 function App() {
   const { settings } = useStore();

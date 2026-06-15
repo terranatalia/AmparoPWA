@@ -74,7 +74,6 @@ const DDD_LIST = [
 ];
 
 export default function ContactsPage() {
-  const { addContact, removeContact, updateContact } = useStore();
   const [contacts, setContacts] = useState([]);
   const [erro, setErro] = useState(null);
   const [isAdding, setIsAdding] = useState(false);
@@ -82,17 +81,26 @@ export default function ContactsPage() {
   
   const [formData, setFormData] = useState({ name: '', ddd: '11', phone: '' });
 
-useEffect(() => {
-  api.get('/contato_emergencia')
-    .then(response => {
-      setContacts(response.data); 
-    })
-    .catch(err => {
-      console.error("Erro ao carregar contatos do banco:", err);
-      setErro("Falha ao carregar os contatos de emergência.");
-    });
-}, []);
+  const buscarContatos = () => {
+    api.get('/contato-emergencia/getAll')
+      .then(response => {
+        const list = response.data.contatos || [];
+        const mapped = list.map(c => ({
+          id: c.id_contato_emergencia,
+          name: c.nome_contato,
+          phone: c.telefone_contato
+        }));
+        setContacts(mapped);
+      })
+      .catch(err => {
+        console.error("Erro ao carregar contatos do banco:", err);
+        setErro("Falha ao carregar os contatos de emergência.");
+      });
+  };
 
+  useEffect(() => {
+    buscarContatos();
+  }, []);
 
   const applyMask = (val) => {
     let v = val.replace(/\D/g, '');
@@ -113,50 +121,71 @@ useEffect(() => {
     let raw = c.phone.replace(/\D/g, '');
     let dddState = '11';
     let phonePart = '';
-   
-
-const handleSubmit = async (e) => {
-  e.preventDefault();
-  const rawPhone = formData.phone.replace(/\D/g, '');
-  
-  if (!formData.name.trim() || rawPhone.length < 8) {
-    alert("Por favor, preencha o número corretamente (8 ou 9 dígitos).");
-    return;
-  }
-
-  const E164Phone = `55${formData.ddd}${rawPhone}`;
-  const contactPayload = { name: formData.name, phone: E164Phone };
-
-  try {
-    if (editingId) {
-      const response = await api.put(`/contato_emergencia/${editingId}`, contactPayload);
-      
-      setContacts(prev => prev.map(c => c.id === editingId ? response.data : c));
-      alert("Contato atualizado com sucesso!");
+    
+    if (raw.startsWith('55') && raw.length >= 12) {
+      dddState = raw.substring(2, 4);
+      phonePart = raw.substring(4);
+    } else if (raw.length >= 10) {
+      dddState = raw.substring(0, 2);
+      phonePart = raw.substring(2);
     } else {
-   
-      const response = await api.post('/contato_emergencia', contactPayload);
-      
-      setContacts(prev => [...prev, response.data]);
-      alert("Contato adicionado com sucesso!");
+      phonePart = raw;
     }
+
+    setFormData({ name: c.name, ddd: dddState, phone: applyMask(phonePart) });
+    setEditingId(c.id);
+    setIsAdding(true);
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    const rawPhone = formData.phone.replace(/\D/g, '');
     
-    resetForm();
-  } catch (err) {
-    console.error("Erro ao salvar contato no servidor:", err);
-    alert("Erro ao salvar contato. Verifique se o backend está ligado.");
-  }
-};
-    
+    if (!formData.name.trim() || rawPhone.length < 8) {
+      alert("Por favor, preencha o número corretamente (8 ou 9 dígitos).");
+      return;
+    }
+
     const E164Phone = `55${formData.ddd}${rawPhone}`;
-    const contactPayload = { name: formData.name, phone: E164Phone };
-    
-    if (editingId) {
-      updateContact(editingId, contactPayload);
-    } else {
-      addContact(contactPayload);
+
+    try {
+      if (editingId) {
+        const contactPayload = {
+          nome_contato: formData.name,
+          telefone_contato: E164Phone
+        };
+        await api.put(`/contato-emergencia/update/${editingId}`, contactPayload);
+        alert("Contato atualizado com sucesso!");
+      } else {
+        const contactPayload = {
+          id_usuario: 1,
+          id_usuario_tipo: 1,
+          nome_contato: formData.name,
+          telefone_contato: E164Phone
+        };
+        await api.post('/contato-emergencia/create', contactPayload);
+        alert("Contato adicionado com sucesso!");
+      }
+      
+      resetForm();
+      buscarContatos();
+    } catch (err) {
+      console.error("Erro ao salvar contato no servidor:", err);
+      alert("Erro ao salvar contato. Verifique se o backend está ligado.");
     }
-    resetForm();
+  };
+
+  const handleDelete = async (id, name) => {
+    if (window.confirm(`Deseja remover ${name}?`)) {
+      try {
+        await api.delete(`/contato-emergencia/delete/${id}`);
+        alert("Contato removido com sucesso!");
+        buscarContatos();
+      } catch (err) {
+        console.error("Erro ao deletar contato no servidor:", err);
+        alert("Erro ao remover contato. Verifique se o backend está ligado.");
+      }
+    }
   };
 
   const formatDisplayPhone = (p) => {
@@ -265,9 +294,7 @@ const handleSubmit = async (e) => {
                 <Edit2 size={16} />
               </button>
               <button 
-                onClick={() => {
-                  if(window.confirm(`Deseja remover ${contact.name}?`)) removeContact(contact.id);
-                }}
+                onClick={() => handleDelete(contact.id, contact.name)}
                 className="btn btn-danger"
                 style={{ padding: '0.5rem', borderRadius: '0.5rem' }}
                 title="Remover Contato"

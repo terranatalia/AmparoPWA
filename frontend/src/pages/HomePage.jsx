@@ -9,22 +9,28 @@ export default function HomePage() {
   const [countdown, setCountdown] = useState(null);
   const [contacts, setContacts] = useState([]);
   const [emergencyMessage, setEmergencyMessage] = useState("Preciso de ajuda urgente!");
+  const [messageId, setMessageId] = useState(null);
   const [erro, setErro] = useState(null);
 
 
   useEffect(() => {
     const buscarDadosIniciais = async () => {
       try {
-   
-        const resContatos = await api.get('/contato_emergencia');
-        if (resContatos.data && resContatos.data.length > 0) {
-  
-          setContacts(resContatos.data);
+        const resContatos = await api.get('/contato-emergencia/getAll');
+        if (resContatos.data && resContatos.data.contatos) {
+          const mapped = resContatos.data.contatos.map(c => ({
+            id: c.id_contato_emergencia,
+            name: c.nome_contato,
+            phone: c.telefone_contato
+          }));
+          setContacts(mapped);
         }
 
-        const resMensagem = await api.get('/mensagem');
-        if (resMensagem.data && resMensagem.data.length > 0) {
-          setEmergencyMessage(resMensagem.data[0].conteudo || resMensagem.data[0].texto);
+        const resMensagem = await api.get('/mensagem/getAll');
+        if (resMensagem.data && resMensagem.data.mensagens && resMensagem.data.mensagens.length > 0) {
+          const firstMsg = resMensagem.data.mensagens[0];
+          setEmergencyMessage(firstMsg.texto);
+          setMessageId(firstMsg.id_mensagem);
         }
       } catch (err) {
         console.error("Erro ao carregar dados da Home:", err);
@@ -60,60 +66,61 @@ export default function HomePage() {
     setCountdown(null);
   };
 
- const triggerHelp = async () => {
-
-  if (!contacts || contacts.length === 0) {
-    alert("Por favor, adicione um contato de emergência na aba Contatos antes de pedir ajuda.");
-    return;
-  }
-
-  let message = emergencyMessage;
-  let latitudeAtual = null;
-  let longitudeAtual = null;
-
- 
-  if (navigator.geolocation) {
-    try {
-      const position = await new Promise((resolve, reject) => {
-        navigator.geolocation.getCurrentPosition(resolve, reject, { timeout: 10000 });
-      });
-      
-      const { latitude, longitude } = position.coords;
-      latitudeAtual = latitude;
-      longitudeAtual = longitude;
-      
-      message += `\n\nMinha localização: https://maps.google.com/?q=${latitude},${longitude}`;
-    } catch (e) {
-      console.error("Localização falhou", e);
+  const triggerHelp = async () => {
+    if (!contacts || contacts.length === 0) {
+      alert("Por favor, adicione um contato de emergência na aba Contatos antes de pedir ajuda.");
+      return;
     }
-  }
 
+    let message = emergencyMessage;
+    let latitudeAtual = null;
+    let longitudeAtual = null;
 
-  try {
-    const payloadAlerta = {
-      descricao: "Botão de emergência acionado",
-      latitude: latitudeAtual,
-      longitude: longitudeAtual,
-      data: new Date().toISOString()
-    };
+    if (navigator.geolocation) {
+      try {
+        const position = await new Promise((resolve, reject) => {
+          navigator.geolocation.getCurrentPosition(resolve, reject, { timeout: 10000 });
+        });
+        
+        const { latitude, longitude } = position.coords;
+        latitudeAtual = latitude;
+        longitudeAtual = longitude;
+        
+        message += `\n\nMinha localização: https://maps.google.com/?q=${latitude},${longitude}`;
+      } catch (e) {
+        console.error("Localização falhou", e);
+      }
+    }
 
-   
-    await api.post('/alerta', payloadAlerta);
-    console.log("Alerta registrado com sucesso no MariaDB!");
-  } catch (err) {
-  
-    console.error("Falha ao registrar histórico de alerta no banco:", err);
-  }
+    try {
+      const payloadAlerta = {
+        id_mensagem: messageId || 1,
+        id_usuario: 1,
+        data_hora: new Date().toISOString(),
+        status: "Ativo",
+        observacao: latitudeAtual ? `Alerta acionado. Localização: Lat ${latitudeAtual}, Lng ${longitudeAtual}` : "Alerta acionado sem GPS"
+      };
 
+      await api.post('/alerta/create', payloadAlerta);
+      console.log("Alerta registrado com sucesso no MariaDB!");
+    } catch (err) {
+      console.error("Falha ao registrar histórico de alerta no banco:", err);
+    }
 
-  const phone = contacts[0].phone.replace(/\D/g, '');
-  const url = `https://wa.me/${phone}?text=${encodeURIComponent(message)}`;
+    // Procura se tem algum preferencial salvo localmente
+    const defaultContactId = settings.selectedContactId;
+    let targetContact = contacts.find(c => c.id === defaultContactId);
+    if (!targetContact && contacts.length > 0) {
+      targetContact = contacts[0];
+    }
 
-  if (navigator.vibrate) navigator.vibrate([200, 100, 200]);
+    const phone = targetContact ? targetContact.phone.replace(/\D/g, '') : contacts[0].phone.replace(/\D/g, '');
+    const url = `https://wa.me/${phone}?text=${encodeURIComponent(message)}`;
 
+    if (navigator.vibrate) navigator.vibrate([200, 100, 200]);
 
-  window.location.href = url;
-};
+    window.location.href = url;
+  };
     
   return (
     <div className="page-container" style={{ alignItems: 'center', justifyContent: 'center', flexGrow: 1, textAlign: 'center' }}>
